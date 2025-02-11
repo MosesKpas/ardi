@@ -1,9 +1,16 @@
 import 'package:ardi/screens/login.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:ardi/utils/auth.dart'; // Assure-toi que ton AuthService est importé
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
 
+  @override
+  _ProfilePageState createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -11,55 +18,63 @@ class ProfilePage extends StatelessWidget {
         child: Column(
           children: [
             // Section 1 : Image du profil et bouton se connecter
-            Stack(
-              children: [
-                Container(
-                  height: 200,
-                  color:
-                      const Color.fromRGBO(204, 20, 205, 100).withOpacity(0.1),
-                  child: const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircleAvatar(
-                          radius: 50,
-                          backgroundImage:
-                              const AssetImage('assets/images/profile.png'),
+            StreamBuilder<User?>(
+              stream: FirebaseAuth.instance.authStateChanges(),
+              builder: (context, snapshot) {
+                User? user = snapshot.data;
+
+                return Stack(
+                  children: [
+                    Container(
+                      height: 200,
+                      color: const Color.fromRGBO(204, 20, 205, 100).withOpacity(0.1),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircleAvatar(
+                              radius: 50,
+                              backgroundImage: user != null && user.photoURL != null
+                                  ? NetworkImage(user.photoURL!)
+                                  : const AssetImage('assets/images/profile.png')
+                              as ImageProvider,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              user != null ? user.displayName ?? 'Utilisateur' : 'Utilisateur',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Utilisateur',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 16,
-                  top: 16,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const LoginPage()),
-                      );
-                    },
-                    icon: const Icon(Icons.login),
-                    label: const Text('Se connecter'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromRGBO(204, 20, 205, 100),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                  ),
-                ),
-              ],
+                    if (user == null) // Si l'utilisateur n'est pas connecté
+                      Positioned(
+                        left: 16,
+                        top: 16,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const LoginPage()),
+                            );
+                          },
+                          icon: const Icon(Icons.login),
+                          label: const Text('Se connecter'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color.fromRGBO(204, 20, 205, 100),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
 
             const SizedBox(height: 16),
@@ -120,24 +135,28 @@ class ProfilePage extends StatelessWidget {
             const SizedBox(height: 32),
 
             // Section 3 : Déconnexion
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                children: [
-                  const Divider(color: Colors.grey),
-                  _buildOptionItem(
-                    context,
-                    icon: Icons.logout,
-                    text: 'Se déconnecter',
-                    onTap: () {
-                      // Logique pour se déconnecter
-                      print('Se déconnecter');
-                    },
-                    isLogout: true,
-                  ),
-                ],
+            if (mounted) // Si l'utilisateur est connecté
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  children: [
+                    const Divider(color: Colors.grey),
+                    _buildOptionItem(
+                      context,
+                      icon: Icons.logout,
+                      text: 'Se déconnecter',
+                      onTap: () async {
+                        await AuthService().signOut(); // Déconnexion de Firebase
+                        setState(() {
+                          // On met à jour l'état pour recharger la page
+                        });
+                        print('Se déconnecter');
+                      },
+                      isLogout: true,
+                    ),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -145,12 +164,12 @@ class ProfilePage extends StatelessWidget {
   }
 
   Widget _buildOptionItem(
-    BuildContext context, {
-    required IconData icon,
-    required String text,
-    required VoidCallback onTap,
-    bool isLogout = false,
-  }) {
+      BuildContext context, {
+        required IconData icon,
+        required String text,
+        required VoidCallback onTap,
+        bool isLogout = false,
+      }) {
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -179,3 +198,4 @@ class ProfilePage extends StatelessWidget {
     );
   }
 }
+

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Ajouté pour récupérer l'utilisateur
 import 'package:ardi/screens/accueilscreens/assistance.dart';
 import 'package:ardi/screens/accueilscreens/consultation.dart';
 import 'package:ardi/screens/accueilscreens/dossier.dart';
@@ -56,32 +57,52 @@ class _AccueilPageState extends State<AccueilPage> {
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,  // Alignement centré
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Section 1: Salutation et message animé
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center, // Centrer la Row
-                children: [
-                  const CircleAvatar(
-                    radius: 40,
-                    backgroundImage: AssetImage('assets/images/profile.png'),
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.center, // Centrer le texte
+              StreamBuilder<User?>(
+                stream: FirebaseAuth.instance.authStateChanges(),
+                builder: (context, snapshot) {
+                  User? user = snapshot.data;
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        _salutation(),
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundImage: user != null && user.photoURL != null
+                            ? NetworkImage(user.photoURL!)
+                            : const AssetImage('assets/images/profile.png')
+                        as ImageProvider,
                       ),
-                      const SizedBox(height: 8),
-                      _buildAnimatedText(),
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _salutation(),
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          user != null
+                              ? Text(
+                            user.displayName ?? 'Utilisateur',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          )
+                              : const SizedBox.shrink(),
+                          const SizedBox(height: 8),
+                          _buildAnimatedText(),
+                        ],
+                      ),
                     ],
-                  ),
-                ],
+                  );
+                },
               ),
               const SizedBox(height: 32),
 
@@ -157,15 +178,15 @@ class _AccueilPageState extends State<AccueilPage> {
                         context, services[index]['page'] as Widget),
                     child: Card(
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),  // Coins arrondis
+                        borderRadius: BorderRadius.circular(15),
                       ),
-                      elevation: 5,  // Ombre plus marquée
+                      elevation: 5,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
                             services[index]['icon'] as IconData,
-                            size: 50,  // Taille plus grande de l'icône
+                            size: 50,
                             color: const Color.fromRGBO(204, 20, 205, 100),
                           ),
                           const SizedBox(height: 8),
@@ -175,7 +196,7 @@ class _AccueilPageState extends State<AccueilPage> {
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
-                              color: Colors.purple,  // Texte coloré pour attirer l'attention
+                              color: Colors.purple,
                             ),
                           ),
                         ],

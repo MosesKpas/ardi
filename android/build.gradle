@@ -1,3 +1,14 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.3.0' // Vérifie cette ligne
+        classpath 'com.google.gms:google-services:4.3.10' // Place cette ligne ici ✅
+    }
+}
+
 allprojects {
     repositories {
         google()

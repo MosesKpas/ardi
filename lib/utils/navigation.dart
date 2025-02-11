@@ -48,7 +48,7 @@ class _NavigationPageState extends State<NavigationPage> {
       appBar: AppBar(
         title: const Text('Ardi'),
         backgroundColor: const Color.fromRGBO(204, 20, 205, 100),
-        centerTitle: true,
+        centerTitle: false,
       ),
       body: PageView(
         controller: _pageController,
