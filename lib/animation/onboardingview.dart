@@ -24,9 +24,9 @@ class _OnBoardingViewState extends State<OnBoardingView> {
       bottomSheet: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         decoration: const BoxDecoration(
-          color: Colors.white, // Couleur blanche pour la simplicité
+          color: Colors.white,
           border: Border(
-            top: BorderSide(color: Color.fromRGBO(204, 20, 205, 100), width: 0.5), // Bordure subtile
+            top: BorderSide(color: Color.fromRGBO(204, 20, 205, 100), width: 0.5),
           ),
         ),
         child: isLastPage
@@ -92,30 +92,30 @@ class _OnBoardingViewState extends State<OnBoardingView> {
               children: [
                 // Animation Lottie
                 SizedBox(
-                  height: 250, // Taille réduite pour un design plus minimaliste
+                  height: 250, // Taille
                   child: Lottie.asset(controller.items[index].image,
                       fit: BoxFit.contain),
                 ),
                 const SizedBox(height: 40),
-                // Titre avec un design minimaliste et pro
+                // Titre
                 Text(
                   controller.items[index].titre,
                   style: const TextStyle(
                     fontSize:
-                        24, // Taille de police réduite pour plus d'élégance
+                        24, // Taille de police
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87, // Couleur subtile pour un look pro
+                    color: Colors.black87, // Couleur
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 15),
-                // Description avec une meilleure lisibilité
+                // Description
                 Text(
                   controller.items[index].descriptions,
                   style: const TextStyle(
                     fontSize: 16,
                     color: Colors
-                        .black54, // Texte légèrement foncé pour un ton doux
+                        .black54, // Texte légèrement foncé
                     height: 1.5,
                   ),
                   textAlign: TextAlign.center,

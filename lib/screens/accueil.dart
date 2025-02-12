@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Ajouté pour récupérer l'utilisateur
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:ardi/screens/accueilscreens/assistance.dart';
 import 'package:ardi/screens/accueilscreens/consultation.dart';
 import 'package:ardi/screens/accueilscreens/dossier.dart';
@@ -44,7 +44,7 @@ class _AccueilPageState extends State<AccueilPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => SizedBox(
-        height: MediaQuery.of(context).size.height * 0.85, // Taille modale
+        height: MediaQuery.of(context).size.height * 0.85,
         child: page,
       ),
     );
@@ -139,7 +139,7 @@ class _AccueilPageState extends State<AccueilPage> {
                   mainAxisSpacing: 10,
                   childAspectRatio: 3 / 2,
                 ),
-                itemCount: 6, // Nombre de services
+                itemCount: 6,
                 itemBuilder: (context, index) {
                   final services = [
                     {

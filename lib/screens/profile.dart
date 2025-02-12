@@ -1,7 +1,10 @@
-import 'package:ardi/screens/login.dart';
+import 'package:ardi/screens/profile/editer.dart';
+import 'package:ardi/screens/profile/privacy.dart';
+import 'package:ardi/screens/profile/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:ardi/utils/auth.dart'; // Assure-toi que ton AuthService est importé
+import 'package:ardi/screens/login.dart';
+import 'package:ardi/utils/auth.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -11,6 +14,17 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  void _showBottomSheet(Widget page) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => page,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -36,39 +50,30 @@ class _ProfilePageState extends State<ProfilePage> {
                               radius: 50,
                               backgroundImage: user != null && user.photoURL != null
                                   ? NetworkImage(user.photoURL!)
-                                  : const AssetImage('assets/images/profile.png')
-                              as ImageProvider,
+                                  : const AssetImage('assets/images/profile.png') as ImageProvider,
                             ),
                             const SizedBox(height: 8),
                             Text(
                               user != null ? user.displayName ?? 'Utilisateur' : 'Utilisateur',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    if (user == null) // Si l'utilisateur n'est pas connecté
+                    if (user == null)
                       Positioned(
                         left: 16,
                         top: 16,
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const LoginPage()),
-                            );
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginPage()));
                           },
                           icon: const Icon(Icons.login),
                           label: const Text('Se connecter'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color.fromRGBO(204, 20, 205, 100),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ),
@@ -84,49 +89,20 @@ class _ProfilePageState extends State<ProfilePage> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 children: [
-                  const Text(
-                    'Options de Profil',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   _buildOptionItem(
-                    context,
                     icon: Icons.edit,
                     text: 'Modifier le profil',
-                    onTap: () {
-                      // Logique pour modifier le profil
-                      print('Modifier le profil');
-                    },
+                    onTap: () => _showBottomSheet(EditProfilePage()),
                   ),
                   _buildOptionItem(
-                    context,
                     icon: Icons.settings,
                     text: 'Paramètres',
-                    onTap: () {
-                      // Logique pour ouvrir les paramètres
-                      print('Paramètres');
-                    },
+                    onTap: () => _showBottomSheet(const SettingsPage()),
                   ),
                   _buildOptionItem(
-                    context,
                     icon: Icons.lock,
                     text: 'Confidentialité',
-                    onTap: () {
-                      // Logique pour gérer la confidentialité
-                      print('Confidentialité');
-                    },
-                  ),
-                  _buildOptionItem(
-                    context,
-                    icon: Icons.policy,
-                    text: 'Politique de confidentialité',
-                    onTap: () {
-                      // Logique pour consulter la politique
-                      print('Politique de confidentialité');
-                    },
+                    onTap: () => _showBottomSheet(const PrivacyPage()),
                   ),
                 ],
               ),
@@ -135,22 +111,18 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 32),
 
             // Section 3 : Déconnexion
-            if (mounted) // Si l'utilisateur est connecté
+            if (mounted)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Column(
                   children: [
                     const Divider(color: Colors.grey),
                     _buildOptionItem(
-                      context,
                       icon: Icons.logout,
                       text: 'Se déconnecter',
                       onTap: () async {
-                        await AuthService().signOut(); // Déconnexion de Firebase
-                        setState(() {
-                          // On met à jour l'état pour recharger la page
-                        });
-                        print('Se déconnecter');
+                        await AuthService().signOut();
+                        setState(() {});
                       },
                       isLogout: true,
                     ),
@@ -163,13 +135,12 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildOptionItem(
-      BuildContext context, {
-        required IconData icon,
-        required String text,
-        required VoidCallback onTap,
-        bool isLogout = false,
-      }) {
+  Widget _buildOptionItem({
+    required IconData icon,
+    required String text,
+    required VoidCallback onTap,
+    bool isLogout = false,
+  }) {
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -178,9 +149,7 @@ class _ProfilePageState extends State<ProfilePage> {
           children: [
             Icon(
               icon,
-              color: isLogout
-                  ? Colors.red
-                  : const Color.fromRGBO(204, 20, 205, 100),
+              color: isLogout ? Colors.red : const Color.fromRGBO(204, 20, 205, 100),
               size: 24,
             ),
             const SizedBox(width: 16),
@@ -198,4 +167,3 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 }
-

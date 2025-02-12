@@ -6,7 +6,7 @@ import 'package:ardi/screens/rdv.dart';
 import 'package:flutter/material.dart';
 
 class NavigationPage extends StatefulWidget {
-  final int initialIndex; // Nouvel argument pour spécifier l'onglet initial
+  final int initialIndex;
 
   const NavigationPage(
       {super.key, this.initialIndex = 0}); // Index par défaut = 0 (Accueil)
@@ -22,7 +22,6 @@ class _NavigationPageState extends State<NavigationPage> {
   @override
   void initState() {
     super.initState();
-    // Initialiser l'index et le contrôleur de page avec l'index initial
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: _currentIndex);
   }
