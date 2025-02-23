@@ -1,12 +1,17 @@
+import 'package:ardi/screens/admin/admin.dart';
+import 'package:ardi/screens/docteurs/docta.dart';
+import 'package:ardi/utils/auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ardi/screens/accueilscreens/assistance.dart';
 import 'package:ardi/screens/accueilscreens/consultation.dart';
 import 'package:ardi/screens/accueilscreens/dossier.dart';
 import 'package:ardi/screens/accueilscreens/sequencage.dart';
 import 'package:ardi/screens/accueilscreens/rdvaccueil.dart';
 import 'package:ardi/screens/accueilscreens/formation.dart';
+import 'package:ardi/model/patient.dart';
 
 class AccueilPage extends StatefulWidget {
   const AccueilPage({Key? key}) : super(key: key);
@@ -16,6 +21,21 @@ class AccueilPage extends StatefulWidget {
 }
 
 class _AccueilPageState extends State<AccueilPage> {
+  @override
+  void initState(){
+    super.initState();
+    _checkRoleAndRedirect();
+  }
+  Future<void> _checkRoleAndRedirect() async {
+    String? role = await AuthService().getUserRole();
+    if (role == 'admin') {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const AdminDashboardPage()));
+    } else if (role == 'docta') {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const DoctorDashboardPage()));
+    }
+  }
+
+
   String _salutation() {
     final hour = DateTime.now().hour;
     return hour < 12 ? 'Bonjour' : 'Bonsoir';
@@ -62,45 +82,128 @@ class _AccueilPageState extends State<AccueilPage> {
               // Section 1: Salutation et message animé
               StreamBuilder<User?>(
                 stream: FirebaseAuth.instance.authStateChanges(),
-                builder: (context, snapshot) {
-                  User? user = snapshot.data;
+                builder: (context, authSnapshot) {
+                  if (authSnapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircleAvatar(
-                        radius: 40,
-                        backgroundImage: user != null && user.photoURL != null
-                            ? NetworkImage(user.photoURL!)
-                            : const AssetImage('assets/images/profile.png')
-                        as ImageProvider,
-                      ),
-                      const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  User? user = authSnapshot.data;
+
+                  if (user == null) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const CircleAvatar(
+                          radius: 40,
+                          backgroundImage: AssetImage('assets/images/profile.png'),
+                        ),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _salutation(),
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Utilisateur',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            _buildAnimatedText(),
+                          ],
+                        ),
+                      ],
+                    );
+                  }
+
+                  // Charger les données du patient depuis Firestore
+                  return StreamBuilder<DocumentSnapshot>(
+                    stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+                    builder: (context, firestoreSnapshot) {
+                      if (firestoreSnapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      if (!firestoreSnapshot.hasData || !firestoreSnapshot.data!.exists) {
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const CircleAvatar(
+                              radius: 40,
+                              backgroundImage: AssetImage('assets/images/profile.png'),
+                            ),
+                            const SizedBox(width: 16),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _salutation(),
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Utilisateur',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                _buildAnimatedText(),
+                              ],
+                            ),
+                          ],
+                        );
+                      }
+
+                      Patient patient = Patient.fromMap(firestoreSnapshot.data!.data() as Map<String, dynamic>);
+
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            _salutation(),
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          CircleAvatar(
+                            radius: 40,
+                            backgroundImage: patient.photoURL != null
+                                ? NetworkImage(patient.photoURL!)
+                                : const AssetImage('assets/images/profile.png') as ImageProvider,
                           ),
-                          const SizedBox(height: 8),
-                          user != null
-                              ? Text(
-                            user.displayName ?? 'Utilisateur',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          )
-                              : const SizedBox.shrink(),
-                          const SizedBox(height: 8),
-                          _buildAnimatedText(),
+                          const SizedBox(width: 16),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _salutation(),
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${patient.prenom} ${patient.nom}'.trim(),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              _buildAnimatedText(),
+                            ],
+                          ),
                         ],
-                      ),
-                    ],
+                      );
+                    },
                   );
                 },
               ),
@@ -142,40 +245,15 @@ class _AccueilPageState extends State<AccueilPage> {
                 itemCount: 6,
                 itemBuilder: (context, index) {
                   final services = [
-                    {
-                      'name': 'Consultation',
-                      'icon': Icons.medical_services,
-                      'page': ConsultationPage()
-                    },
-                    {
-                      'name': 'Rendez-vous',
-                      'icon': Icons.calendar_today,
-                      'page': RendezVousPage()
-                    },
-                    {
-                      'name': 'Dossiers médicaux',
-                      'icon': Icons.folder_open,
-                      'page': DossierMedicalPage()
-                    },
-                    {
-                      'name': 'Séquençage',
-                      'icon': Icons.schema,
-                      'page': SequencagePage()
-                    },
-                    {
-                      'name': 'Assistance',
-                      'icon': Icons.headset_mic,
-                      'page': AssistancePage()
-                    },
-                    {
-                      'name': 'Formation',
-                      'icon': Icons.rocket_launch,
-                      'page': FormationPage()
-                    },
+                    {'name': 'Consultation', 'icon': Icons.medical_services, 'page': ConsultationPage()},
+                    {'name': 'Rendez-vous', 'icon': Icons.calendar_today, 'page': RendezVousPage()},
+                    {'name': 'Dossiers médicaux', 'icon': Icons.folder_open, 'page': DossierMedicalPage()},
+                    {'name': 'Séquençage', 'icon': Icons.schema, 'page': SequencagePage()},
+                    {'name': 'Assistance', 'icon': Icons.headset_mic, 'page': AssistancePage()},
+                    {'name': 'Formation', 'icon': Icons.rocket_launch, 'page': FormationPage()},
                   ];
                   return GestureDetector(
-                    onTap: () => _showServiceModal(
-                        context, services[index]['page'] as Widget),
+                    onTap: () => _showServiceModal(context, services[index]['page'] as Widget),
                     child: Card(
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15),

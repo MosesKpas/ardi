@@ -3,16 +3,35 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+/// Classe pour gérer les résultats d'authentification
+class AuthResult {
+  final Patient? patient;
+  final String? error;
+  AuthResult({this.patient, this.error});
+}
+
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  //Methode pour obtenir le role de l'utilisateur connecte
+  Future<String?> getUserRole() async{
+    User? user = _auth.currentUser;
+    if(user == null) return null;
+
+    DocumentSnapshot doc = await _firestore.collection('users').doc(user.uid).get();
+    if(doc.exists){
+      return (doc.data() as Map<String, dynamic>)['role']as String?;
+    }
+    return null;
+  }
+
   // Connexion avec Google
-  Future<Patient?> signInWithGoogle() async {
+  Future<AuthResult> signInWithGoogle() async {
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return null;
+      if (googleUser == null) return AuthResult(error: "Connexion annulée");
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
@@ -24,26 +43,24 @@ class AuthService {
       User? user = userCredential.user;
 
       if (user != null) {
-        // Vérifier si l'utilisateur existe dans Firestore
         DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
-          return Patient.fromMap(userDoc.data() as Map<String, dynamic>);
+          return AuthResult(patient: Patient.fromMap(userDoc.data() as Map<String, dynamic>));
         } else {
-          print("Compte inexistant. Demande de création requise.");
-          return null;
+          return AuthResult(error: "Compte inexistant. Veuillez créer un compte.");
         }
       }
-      return null;
+      return AuthResult(error: "Utilisateur non trouvé");
     } catch (e) {
-      print("Erreur de connexion Google : $e");
-      return null;
+      return AuthResult(error: "Erreur de connexion Google : $e");
     }
   }
-//creer un compte avec google
-  Future<Patient?> createWithGoogle() async {
+
+  /// Création de compte avec Google
+  Future<AuthResult> createWithGoogle() async {
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return null;
+      if (googleUser == null) return AuthResult(error: "Création annulée");
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
@@ -57,28 +74,32 @@ class AuthService {
       if (user != null) {
         DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
         if (!userDoc.exists) {
-          // Création du profil utilisateur
-          await _firestore.collection('users').doc(user.uid).set({
+          List<String> nameParts = (user.displayName ?? "").split(' ');
+          String prenom = nameParts.isNotEmpty ? nameParts.first : "";
+          String nom = nameParts.length > 1 ? nameParts.last : "";
+
+          Map<String, dynamic> userData = {
             'uid': user.uid,
-            'prenom': user.displayName?.split(' ').first ?? '',
-            'nom': user.displayName?.split(' ').last ?? '',
+            'prenom': prenom,
+            'nom': nom,
             'email': user.email,
             'photoURL': user.photoURL,
+            'role':'patient',
             'dateCreation': FieldValue.serverTimestamp(),
-          });
+          };
+          await _firestore.collection('users').doc(user.uid).set(userData);
+          return AuthResult(patient: Patient.fromMap(userData));
         }
-
-        return Patient.fromMap((await _firestore.collection('users').doc(user.uid).get()).data() as Map<String, dynamic>);
+        return AuthResult(patient: Patient.fromMap(userDoc.data() as Map<String, dynamic>));
       }
-      return null;
+      return AuthResult(error: "Utilisateur non trouvé");
     } catch (e) {
-      print("Erreur lors de la création du compte Google : $e");
-      return null;
+      return AuthResult(error: "Erreur lors de la création du compte Google : $e");
     }
   }
 
-  // Connexion avec email et mot de passe
-  Future<Patient?> signInWithEmailAndPassword(String email, String password) async {
+  /// Connexion avec email et mot de passe
+  Future<AuthResult> signInWithEmailAndPassword(String email, String password) async {
     try {
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: email,
@@ -87,23 +108,60 @@ class AuthService {
       User? user = userCredential.user;
 
       if (user != null) {
-        // Récupérer les données de l'utilisateur depuis Firestore
         DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
-
-        // Créer et retourner l'objet Patient
-        return Patient.fromMap(userDoc.data() as Map<String, dynamic>);
+        if (userDoc.exists) {
+          return AuthResult(patient: Patient.fromMap(userDoc.data() as Map<String, dynamic>));
+        } else {
+          return AuthResult(error: "Compte inexistant. Veuillez créer un compte.");
+        }
       }
-      return null;
+      return AuthResult(error: "Utilisateur non trouvé");
     } catch (e) {
-      print("Erreur de connexion avec email et mot de passe : $e");
-      return null;
+      return AuthResult(error: "Erreur de connexion : $e");
     }
   }
 
-  // Déconnexion
+  /// Création de compte avec email et mot de passe
+  Future<AuthResult> createWithEmailAndPassword({
+    required String email,
+    required String password,
+    required String prenom,
+    required String nom,
+    String? photoURL,
+  }) async {
+    try {
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      User? user = userCredential.user;
+
+      if (user != null) {
+        DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
+        if (!userDoc.exists) {
+          Map<String, dynamic> userData = {
+            'uid': user.uid,
+            'prenom': prenom,
+            'nom': nom,
+            'email': email,
+            'photoURL': photoURL,
+            'role':'patient',
+            'dateCreation': FieldValue.serverTimestamp(),
+          };
+          await _firestore.collection('users').doc(user.uid).set(userData);
+          return AuthResult(patient: Patient.fromMap(userData));
+        }
+        return AuthResult(patient: Patient.fromMap(userDoc.data() as Map<String, dynamic>));
+      }
+      return AuthResult(error: "Utilisateur non créé");
+    } catch (e) {
+      return AuthResult(error: "Erreur lors de la création du compte : $e");
+    }
+  }
+
+  /// Déconnexion
   Future<void> signOut() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
   }
 }
-

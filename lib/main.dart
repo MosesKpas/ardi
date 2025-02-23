@@ -6,7 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  await _requestPermissions(); // Demande des permissions
+  await _requestPermissions();
 
   runApp(const MyApp());
 }
@@ -16,6 +16,7 @@ Future<void> _requestPermissions() async {
     Permission.camera,
     Permission.photos,
     Permission.storage,
+    Permission.microphone
   ].request();
 }
 

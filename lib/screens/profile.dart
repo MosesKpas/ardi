@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:ardi/screens/login.dart';
 import 'package:ardi/utils/auth.dart';
+import 'package:ardi/model/patient.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -31,37 +33,38 @@ class _ProfilePageState extends State<ProfilePage> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Section 1 : Image du profil et bouton se connecter
             StreamBuilder<User?>(
               stream: FirebaseAuth.instance.authStateChanges(),
               builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
                 User? user = snapshot.data;
 
-                return Stack(
-                  children: [
-                    Container(
-                      height: 200,
-                      color: const Color.fromRGBO(204, 20, 205, 100).withOpacity(0.1),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircleAvatar(
-                              radius: 50,
-                              backgroundImage: user != null && user.photoURL != null
-                                  ? NetworkImage(user.photoURL!)
-                                  : const AssetImage('assets/images/profile.png') as ImageProvider,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              user != null ? user.displayName ?? 'Utilisateur' : 'Utilisateur',
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                          ],
+                if (user == null) {
+                  return Stack(
+                    children: [
+                      Container(
+                        height: 200,
+                        color: const Color.fromRGBO(204, 20, 205, 100).withOpacity(0.1),
+                        child: const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 50,
+                                backgroundImage: AssetImage('assets/images/profile.png'),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Utilisateur',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    if (user == null)
                       Positioned(
                         left: 16,
                         top: 16,
@@ -77,14 +80,56 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                         ),
                       ),
-                  ],
+                    ],
+                  );
+                }
+
+                return StreamBuilder<DocumentSnapshot>(
+                  stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+                  builder: (context, firestoreSnapshot) {
+                    if (firestoreSnapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (!firestoreSnapshot.hasData || !firestoreSnapshot.data!.exists) {
+                      return const Center(child: Text("Données utilisateur non trouvées"));
+                    }
+
+                    Patient patient = Patient.fromMap(firestoreSnapshot.data!.data() as Map<String, dynamic>);
+
+                    return Stack(
+                      children: [
+                        Container(
+                          height: 200,
+                          color: const Color.fromRGBO(204, 20, 205, 100).withOpacity(0.1),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircleAvatar(
+                                  radius: 50,
+                                  backgroundImage: patient.photoURL != null
+                                      ? NetworkImage(patient.photoURL!)
+                                      : const AssetImage('assets/images/profile.png') as ImageProvider,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${patient.prenom} ${patient.nom}'.trim(),
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 );
               },
             ),
 
             const SizedBox(height: 16),
 
-            // Section 2 : Options de profil
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
@@ -110,25 +155,31 @@ class _ProfilePageState extends State<ProfilePage> {
 
             const SizedBox(height: 32),
 
-            // Section 3 : Déconnexion
-            if (mounted)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  children: [
-                    const Divider(color: Colors.grey),
-                    _buildOptionItem(
-                      icon: Icons.logout,
-                      text: 'Se déconnecter',
-                      onTap: () async {
-                        await AuthService().signOut();
-                        setState(() {});
-                      },
-                      isLogout: true,
+            StreamBuilder<User?>(
+              stream: FirebaseAuth.instance.authStateChanges(),
+              builder: (context, snapshot) {
+                if (snapshot.data != null) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      children: [
+                        const Divider(color: Colors.grey),
+                        _buildOptionItem(
+                          icon: Icons.logout,
+                          text: 'Se déconnecter',
+                          onTap: () async {
+                            await AuthService().signOut();
+                            setState(() {});
+                          },
+                          isLogout: true,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
           ],
         ),
       ),
