@@ -10,7 +10,7 @@ void main() async {
 
   runApp(const MyApp());
 }
-
+//Demande des permissions
 Future<void> _requestPermissions() async {
   await [
     Permission.camera,
