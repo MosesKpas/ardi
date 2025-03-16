@@ -1,6 +1,11 @@
 import 'package:ardi/animation/onboardingview.dart';
+import 'package:ardi/screens/accueil.dart';
+import 'package:ardi/screens/admin/admin.dart';
+import 'package:ardi/screens/docteurs/docta.dart';
+import 'package:ardi/utils/auth.dart';
 import 'package:ardi/utils/navigation.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SplaschScrennPage extends StatefulWidget {
@@ -28,23 +33,50 @@ class _SplaschScrennPageState extends State<SplaschScrennPage>
     ).animate(_animationController);
 
     _animationController.forward().whenComplete(() async {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      bool? hasSeenOnboarding = prefs.getBool('hasSeenOnboarding') ?? false;
+      await _checkSessionAndRedirect();
+    });
+  }
 
-      if (hasSeenOnboarding) {
+  Future<void> _checkSessionAndRedirect() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool hasSeenOnboarding = prefs.getBool('hasSeenOnboarding') ?? false;
+
+    if (user != null) {
+      // Utilisateur connecté, vérifier son rôle
+      String? role = await AuthService().getUserRole();
+      if (role == 'admin') {
         Navigator.pushReplacement(
-          // ignore: use_build_context_synchronously
           context,
-          MaterialPageRoute(builder: (context)=>const NavigationPage()),
+          MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
+        );
+      } else if (role == 'docta') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DoctorDashboardPage()),
         );
       } else {
-        Navigator.pushReplacement(
-          // ignore: use_build_context_synchronously
+        Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context)=> const OnBoardingView()),
+          MaterialPageRoute(builder: (context) => const NavigationPage()),
+          (Route<dynamic> route) => false,
         );
       }
-    });
+    } else {
+      if (hasSeenOnboarding) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const NavigationPage()),
+          (Route<dynamic> route) => false,
+        );
+      } else {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const OnBoardingView()),
+          (Route<dynamic> route) => false,
+        );
+      }
+    }
   }
 
   @override
@@ -56,24 +88,25 @@ class _SplaschScrennPageState extends State<SplaschScrennPage>
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-        animation: _backgroundColorAnimation,
-        builder: (context, child) {
-          return Scaffold(
-            body: Stack(
-              children: [
-                Container(
-                  color: _backgroundColorAnimation.value,
-                  child: Center(
-                    child: Image.asset(
-                      'assets/images/path33.png',
-                      fit: BoxFit.contain,
-                      alignment: Alignment.center,
-                    ),
+      animation: _backgroundColorAnimation,
+      builder: (context, child) {
+        return Scaffold(
+          body: Stack(
+            children: [
+              Container(
+                color: _backgroundColorAnimation.value,
+                child: Center(
+                  child: Image.asset(
+                    'assets/images/path33.png',
+                    fit: BoxFit.contain,
+                    alignment: Alignment.center,
                   ),
-                )
-              ],
-            ),
-          );
-        });
+                ),
+              )
+            ],
+          ),
+        );
+      },
+    );
   }
 }

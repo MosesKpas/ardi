@@ -8,8 +8,7 @@ import 'package:flutter/material.dart';
 class NavigationPage extends StatefulWidget {
   final int initialIndex;
 
-  const NavigationPage(
-      {super.key, this.initialIndex = 0}); // Index par défaut = 0 (Accueil)
+  const NavigationPage({super.key, this.initialIndex = 0});
 
   @override
   State<NavigationPage> createState() => _NavigationPageState();
@@ -26,13 +25,15 @@ class _NavigationPageState extends State<NavigationPage> {
     _pageController = PageController(initialPage: _currentIndex);
   }
 
-  final List<Widget> _pages = [
-    const AccueilPage(),
-    const RendezVousPage(),
-    const ContactPage(),
-    const MessagesPage(),
-    const ProfilePage(),
-  ];
+  List<Widget> _buildPages() {
+    return [
+      const AccueilPage(),
+      const RendezVousPage(),
+      const DossierPage(),
+      const MessagesPage(),
+      const ProfilePage(),
+    ];
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -44,11 +45,6 @@ class _NavigationPageState extends State<NavigationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ardi'),
-        backgroundColor: const Color.fromRGBO(204, 20, 205, 100),
-        centerTitle: false,
-      ),
       body: PageView(
         controller: _pageController,
         onPageChanged: (index) {
@@ -56,7 +52,7 @@ class _NavigationPageState extends State<NavigationPage> {
             _currentIndex = index;
           });
         },
-        children: _pages,
+        children: _buildPages(),
       ),
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
@@ -64,10 +60,7 @@ class _NavigationPageState extends State<NavigationPage> {
           indicatorColor: Colors.pink.shade900,
           labelTextStyle: WidgetStateProperty.all(
             const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Colors.white,
-            ),
+                fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white),
           ),
           iconTheme: WidgetStateProperty.all(
             const IconThemeData(color: Colors.white),
@@ -90,9 +83,9 @@ class _NavigationPageState extends State<NavigationPage> {
               selectedIcon: Icon(Icons.calendar_month),
             ),
             NavigationDestination(
-              icon: Icon(Icons.local_phone_outlined),
-              label: 'Contact',
-              selectedIcon: Icon(Icons.local_phone),
+              icon: Icon(Icons.folder_open_outlined),
+              label: 'Dossier',
+              selectedIcon: Icon(Icons.folder_open),
             ),
             NavigationDestination(
               icon: Icon(Icons.message_outlined),

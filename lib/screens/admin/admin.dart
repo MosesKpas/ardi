@@ -1,11 +1,10 @@
+import 'package:ardi/screens/admin/ajout.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ardi/utils/auth.dart';
 import 'package:ardi/model/patient.dart';
-import 'dart:io';
-import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:ardi/screens/login.dart'; // Importer LoginPage
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -14,13 +13,37 @@ class AdminDashboardPage extends StatefulWidget {
   State<AdminDashboardPage> createState() => _AdminDashboardPageState();
 }
 
-class _AdminDashboardPageState extends State<AdminDashboardPage> {
+class _AdminDashboardPageState extends State<AdminDashboardPage> with SingleTickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    )..forward();
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   Future<void> _signOut() async {
     await AuthService().signOut();
     if (mounted) {
-      Navigator.pop(context);
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+            (Route<dynamic> route) => false, // Supprime toutes les routes précédentes
+      );
     }
   }
 
@@ -34,390 +57,257 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddDoctorPage()),
-    );
+    ).then((_) => setState(() {}));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color.fromRGBO(204, 20, 205, 100), Colors.purpleAccent],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         title: StreamBuilder<User?>(
           stream: FirebaseAuth.instance.authStateChanges(),
           builder: (context, snapshot) {
-            if (!snapshot.hasData) return const Text('Admin');
+            if (!snapshot.hasData) return const Text('Admin', style: TextStyle(color: Colors.white));
             return StreamBuilder<DocumentSnapshot>(
               stream: _firestore.collection('users').doc(snapshot.data!.uid).snapshots(),
               builder: (context, docSnapshot) {
                 if (!docSnapshot.hasData || !docSnapshot.data!.exists) {
-                  return const Text('Admin');
+                  return const Text('Admin', style: TextStyle(color: Colors.white));
                 }
                 Patient admin = Patient.fromMap(docSnapshot.data!.data() as Map<String, dynamic>);
-                return Text('- Admin');
+                return Text('${admin.prenom} ${admin.nom} - Admin',
+                    style: const TextStyle(fontSize: 20, color: Colors.white));
               },
             );
           },
         ),
-        backgroundColor: Colors.deepPurple,
-        automaticallyImplyLeading: false,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: _signOut,
             tooltip: 'Déconnexion',
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Statistiques Générales',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              StreamBuilder<QuerySnapshot>(
-                stream: _firestore.collection('users').snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final users = snapshot.data!.docs;
-                  int totalPatients = users.where((user) => user['role'] == 'patient').length;
-                  int totalDoctors = users.where((user) => user['role'] == 'docta').length;
-
-                  return Column(
-                    children: [
-                      _buildStatCard('Patients', totalPatients, Colors.green),
-                      _buildStatCard('Médecins', totalDoctors, Colors.blue),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 30),
-              const Text(
-                'Gestion des Patients',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              StreamBuilder<QuerySnapshot>(
-                stream: _firestore.collection('users').where('role', isEqualTo: 'patient').snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final patients = snapshot.data!.docs;
-
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: patients.length,
-                    itemBuilder: (context, index) {
-                      final patientData = patients[index].data() as Map<String, dynamic>;
-                      final patient = Patient.fromMap(patientData);
-                      bool isActive = patientData['isActive'] ?? true;
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        elevation: 3,
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage: patient.photoURL != null
-                                ? NetworkImage(patient.photoURL!)
-                                : const AssetImage('assets/images/profile.png') as ImageProvider,
-                          ),
-                          title: Text('${patient.prenom} ${patient.nom}'),
-                          subtitle: Text(patient.email),
-                          trailing: Switch(
-                            value: isActive,
-                            onChanged: (value) => _toggleUserStatus(patients[index].id, isActive),
-                            activeColor: Colors.green,
-                            inactiveThumbColor: Colors.red,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-              const SizedBox(height: 30),
-              const Text(
-                'Gestion des Médecins',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              StreamBuilder<QuerySnapshot>(
-                stream: _firestore.collection('users').where('role', isEqualTo: 'docta').snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final doctors = snapshot.data!.docs;
-
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: doctors.length,
-                    itemBuilder: (context, index) {
-                      final doctorData = doctors[index].data() as Map<String, dynamic>;
-                      final doctor = Patient.fromMap(doctorData);
-                      bool isActive = doctorData['isActive'] ?? true;
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        elevation: 3,
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage: doctor.photoURL != null
-                                ? NetworkImage(doctor.photoURL!)
-                                : const AssetImage('assets/images/profile.png') as ImageProvider,
-                          ),
-                          title: Text('${doctor.prenom} ${doctor.nom}'),
-                          subtitle: Text(doctor.email),
-                          trailing: Switch(
-                            value: isActive,
-                            onChanged: (value) => _toggleUserStatus(doctors[index].id, isActive),
-                            activeColor: Colors.green,
-                            inactiveThumbColor: Colors.red,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-              const SizedBox(height: 30),
-              Center(
-                child: ElevatedButton(
-                  onPressed: _navigateToAddDoctorPage,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
-                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                  ),
-                  child: const Text('Ajouter un Médecin', style: TextStyle(fontSize: 16)),
-                ),
-              ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.purple.shade50.withOpacity(0.5),
+              Colors.white,
             ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: SingleChildScrollView(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
+                  _buildStatsSection(),
+                  const SizedBox(height: 30),
+                  _buildSectionTitle('Gestion des Patients'),
+                  _buildPatientsSection(),
+                  const SizedBox(height: 30),
+                  _buildSectionTitle('Gestion des Médecins'),
+                  _buildDoctorsSection(),
+                  const SizedBox(height: 30),
+                  Center(
+                    child: ElevatedButton.icon(
+                      onPressed: _navigateToAddDoctorPage,
+                      icon: const Icon(Icons.add, color: Colors.white),
+                      label: const Text('Ajouter un Médecin'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromRGBO(204, 20, 205, 100),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 5,
+                        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.bold,
+        color: Color.fromRGBO(204, 20, 205, 100),
+      ),
+    );
+  }
+
+  Widget _buildStatsSection() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection('users').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Color.fromRGBO(204, 20, 205, 100))));
+        }
+        final users = snapshot.data!.docs;
+        int totalPatients = users.where((user) => user['role'] == 'patient').length;
+        int totalDoctors = users.where((user) => user['role'] == 'docta').length;
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildStatCard('Patients', totalPatients, Colors.green),
+            _buildStatCard('Médecins', totalDoctors, Colors.blue),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildStatCard(String title, int value, Color color) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
       elevation: 4,
-      child: ListTile(
-        leading: Icon(Icons.bar_chart, color: color, size: 40),
-        title: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        trailing: Text(
-          value.toString(),
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        width: 150,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.white, color.withOpacity(0.1)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.bar_chart, color: color, size: 40),
+            const SizedBox(height: 10),
+            Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
+            Text(
+              value.toString(),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color),
+            ),
+          ],
         ),
       ),
     );
   }
-}
 
-class AddDoctorPage extends StatefulWidget {
-  const AddDoctorPage({super.key});
-
-  @override
-  State<AddDoctorPage> createState() => _AddDoctorPageState();
-}
-
-class _AddDoctorPageState extends State<AddDoctorPage> {
-  final TextEditingController _firstNameController = TextEditingController();
-  final TextEditingController _lastNameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _specialtyController = TextEditingController();
-  final List<String> _daysOfWeek = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-  final List<String> _selectedDays = [];
-  File? _selectedImage;
-  final ImagePicker _picker = ImagePicker();
-  bool _isLoading = false; // État pour le loader
-
-  Future<void> _pickImage(ImageSource source) async {
-    final pickedFile = await _picker.pickImage(source: source);
-    if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-      });
-    }
-  }
-
-  Future<void> _submitDoctor() async {
-    String firstName = _firstNameController.text.trim();
-    String lastName = _lastNameController.text.trim();
-    String email = _emailController.text.trim();
-    String password = _passwordController.text.trim();
-    String specialty = _specialtyController.text.trim();
-
-    if (firstName.isEmpty || lastName.isEmpty || email.isEmpty || password.isEmpty || specialty.isEmpty || _selectedDays.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez remplir tous les champs')),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      User? user = userCredential.user;
-
-      if (user != null) {
-        String? photoURL;
-        if (_selectedImage != null) {
-          final storageRef = FirebaseStorage.instance.ref().child('profile_pics/${user.uid}.jpg');
-          await storageRef.putFile(_selectedImage!);
-          photoURL = await storageRef.getDownloadURL();
+  Widget _buildPatientsSection() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection('users').where('role', isEqualTo: 'patient').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Color.fromRGBO(204, 20, 205, 100))));
         }
+        final patients = snapshot.data!.docs;
 
-        Map<String, dynamic> doctorData = {
-          'uid': user.uid,
-          'prenom': firstName,
-          'nom': lastName,
-          'email': email,
-          'photoURL': photoURL,
-          'role': 'docta',
-          'specialty': specialty,
-          'workingDays': _selectedDays,
-          'isActive': true,
-          'dateCreation': FieldValue.serverTimestamp(),
-        };
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          child: ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: patients.length,
+            itemBuilder: (context, index) {
+              final patientData = patients[index].data() as Map<String, dynamic>;
+              final patient = Patient.fromMap(patientData);
+              bool isActive = patientData['isActive'] ?? true;
 
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set(doctorData);
-
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Médecin Ajouté'),
-            content: Text('Médecin : $firstName $lastName\nEmail : $email\nSpécialité : $specialty\nJours : ${_selectedDays.join(", ")}'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pop();
-                },
-                child: const Text('OK'),
-              ),
-            ],
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                elevation: 3,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage: patient.photoURL != null
+                        ? NetworkImage(patient.photoURL!)
+                        : const AssetImage('assets/images/profile.png') as ImageProvider,
+                    radius: 20,
+                  ),
+                  title: Text('${patient.prenom} ${patient.nom}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(patient.email, style: const TextStyle(color: Colors.grey)),
+                  trailing: Switch(
+                    value: isActive,
+                    onChanged: (value) => _toggleUserStatus(patients[index].id, isActive),
+                    activeColor: Colors.green,
+                    inactiveThumbColor: Colors.red,
+                  ),
+                ),
+              );
+            },
           ),
         );
-
-        _firstNameController.clear();
-        _lastNameController.clear();
-        _emailController.clear();
-        _passwordController.clear();
-        _specialtyController.clear();
-        setState(() {
-          _selectedDays.clear();
-          _selectedImage = null;
-        });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de l’ajout : $e')),
-      );
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ajouter un Médecin'),
-        backgroundColor: Colors.deepPurple,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              _buildTextField(_firstNameController, 'Prénom'),
-              _buildTextField(_lastNameController, 'Nom'),
-              _buildTextField(_emailController, 'Email'),
-              _buildTextField(_passwordController, 'Mot de passe', obscureText: true),
-              _buildTextField(_specialtyController, 'Spécialité'),
-              const SizedBox(height: 20),
-              if (_selectedImage != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Image.file(_selectedImage!, height: 100),
-                ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                    onPressed: () => _pickImage(ImageSource.gallery),
-                    child: const Text('Galerie'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => _pickImage(ImageSource.camera),
-                    child: const Text('Caméra'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Jours de Travail',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Wrap(
-                spacing: 10,
-                children: _daysOfWeek.map((day) {
-                  bool isSelected = _selectedDays.contains(day);
-                  return ChoiceChip(
-                    label: Text(day),
-                    selected: isSelected,
-                    selectedColor: Colors.deepPurple,
-                    onSelected: (selected) {
-                      setState(() {
-                        isSelected ? _selectedDays.remove(day) : _selectedDays.add(day);
-                      });
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-              _isLoading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                onPressed: _submitDoctor,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                ),
-                child: const Text('Ajouter', style: TextStyle(fontSize: 16)),
-              ),
-            ],
-          ),
-        ),
-      ),
+      },
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, {bool obscureText = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: TextField(
-        controller: controller,
-        obscureText: obscureText,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      ),
+  Widget _buildDoctorsSection() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection('users').where('role', isEqualTo: 'docta').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Color.fromRGBO(204, 20, 205, 100))));
+        }
+        final doctors = snapshot.data!.docs;
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          child: ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: doctors.length,
+            itemBuilder: (context, index) {
+              final doctorData = doctors[index].data() as Map<String, dynamic>;
+              final doctor = Patient.fromMap(doctorData);
+              bool isActive = doctorData['isActive'] ?? true;
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                elevation: 3,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage: doctor.photoURL != null
+                        ? NetworkImage(doctor.photoURL!)
+                        : const AssetImage('assets/images/profile.png') as ImageProvider,
+                    radius: 20,
+                  ),
+                  title: Text('${doctor.prenom} ${doctor.nom}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('${doctor.email}\n${doctorData['specialty'] ?? 'Non spécifié'}',
+                      style: const TextStyle(color: Colors.grey)),
+                  trailing: Switch(
+                    value: isActive,
+                    onChanged: (value) => _toggleUserStatus(doctors[index].id, isActive),
+                    activeColor: Colors.green,
+                    inactiveThumbColor: Colors.red,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
